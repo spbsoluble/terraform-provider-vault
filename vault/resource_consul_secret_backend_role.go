@@ -24,7 +24,6 @@ func consulSecretBackendRoleResource() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: consulSecretBackendRoleWrite,
 		ReadContext:   ReadContextWrapper(consulSecretBackendRoleRead),
-		//Read:   ReadWrapper(consulSecretBackendRoleRead),
 		UpdateContext: consulSecretBackendRoleWrite,
 		Delete:        consulSecretBackendRoleDelete,
 		Exists:        consulSecretBackendRoleExists,
@@ -157,8 +156,8 @@ func consulSecretBackendRoleWrite(ctx context.Context, d *schema.ResourceData, m
 
 	path := consulSecretBackendRolePath(backend, name)
 
-	// This loads either the consul_policies or policies field, depending on which the user
-	// provided, and then stores it under both keys in the data.
+	// This loads either the consul_policies or policies field, depending on which the
+	// user provided, and then stores it under both keys in the data.
 	var policies []interface{}
 	if v, ok := d.GetOk("policies"); ok {
 		policies = v.([]interface{})
@@ -171,8 +170,6 @@ func consulSecretBackendRoleWrite(ctx context.Context, d *schema.ResourceData, m
 	nodeIdentities := d.Get("node_identities").(*schema.Set).List()
 
 	data := map[string]interface{}{
-		//"policies":           policies,
-		//"consul_policies":    policies,
 		"consul_roles":       roles,
 		"service_identities": serviceIdentities,
 		"node_identities":    nodeIdentities,
@@ -274,35 +271,22 @@ func consulSecretBackendRoleRead(ctx context.Context, d *schema.ResourceData, me
 		"node_identities":    "node_identities",
 	}
 
-	// Check whether Vault will return consul_policies or policies based on version.
-	checkConsulPolicies, _, err := semver.GreaterThanOrEqual(ctx, client, consts.VaultVersion11)
+	// Check whether Vault will return consul_policies or policies based on its version.
+	hasNewPolicies, _, err := semver.GreaterThanOrEqual(ctx, client, consts.VaultVersion11)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	returnedPoliciesVal := "consul_policies"
-	if !checkConsulPolicies {
+	if _, ok := d.GetOk("policies"); ok || !hasNewPolicies {
 		returnedPoliciesVal = "policies"
 	}
 
-	if _, ok := d.GetOk("consul_policies"); ok {
+	if hasNewPolicies {
 		params["consul_policies"] = returnedPoliciesVal
 	} else {
 		params["policies"] = returnedPoliciesVal
 	}
-
-	//_, hasLegacyPolicies := data["policies"]
-	//if hasLegacyPolicies {
-	//	params["policies"] = "policies"
-	//	if _, ok := d.GetOk("consul_policies"); ok {
-	//		params["policies"] = "consul_policies"
-	//	}
-	//} else {
-	//	params["consul_policies"] = "consul_policies"
-	//	if _, ok := d.GetOk("policies"); ok {
-	//		params["consul_policies"] = "policies"
-	//	}
-	//}
 
 	for k, v := range params {
 		val, ok := data[k]
